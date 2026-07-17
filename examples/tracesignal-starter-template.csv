@@ -1,0 +1,3 @@
+journey_id,customer_id,timestamp,event_order,touchpoint,converted,journey_value,subgroup
+JOURNEY-001,CUSTOMER-001,2026-01-01T09:00:00Z,1,Organic search,1,250.0,Declared cohort A
+JOURNEY-001,CUSTOMER-001,2026-01-03T13:00:00Z,2,Product page,1,250.0,Declared cohort A

@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "TraceSignal: descriptive event-log sequence evidence"
+type: software
+authors:
+  - family-names: Erlingsen
+    given-names: Ulrik
+version: 1.0.0
+date-released: 2026-07-17
+license: AGPL-3.0-or-later
+repository-code: "https://github.com/UlrikErlingsen/journey-path-analysis"
