@@ -41,6 +41,9 @@ def test_app_uses_shared_signal_theme_instead_of_pasted_styles() -> None:
     assert 'st.set_page_config(**sig.page_config("trace"))' in standalone
     assert "sig.apply(NS)" in ui_source
     assert "template=sig.template(NS)" in ui_source
+    # sig.chart sets the per-app template and theme=None, so Streamlit's chart theme cannot replace the palette.
+    assert "sig.chart(NS, " in ui_source
+    assert "st.plotly_chart(" not in ui_source
     assert "<style>" not in standalone + ui_source
     for old_colour in ("#173c3a", "#d95b40", "#83d2b4", "#f2c66d", "#f8f5ed", "#17322e", "#102c2a", "#4a746d"):
         assert old_colour not in (standalone + ui_source).lower()

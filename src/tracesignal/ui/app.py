@@ -274,7 +274,7 @@ def page_transitions(result) -> None:
         "Empirical first-order transitions include START and the observed terminal outcome state.",
     )
     minimum = st.slider("Minimum transitions shown in flow", 1, 100, 12, key=k("flow_minimum"))
-    st.plotly_chart(_sankey(result.transitions, minimum), width="stretch", key=k("sankey_chart"))
+    sig.chart(NS, _sankey(result.transitions, minimum), key=k("sankey_chart"))
     st.markdown("### Transition probabilities")
     st.dataframe(result.transitions, width="stretch", hide_index=True)
 
@@ -299,7 +299,7 @@ def page_transitions(result) -> None:
         template=sig.template(NS),
     )
     figure.update_layout(yaxis_tickformat=".0%", legend_orientation="h", legend_y=1.12, margin=dict(t=35))
-    st.plotly_chart(figure, width="stretch", key=k("roles_chart"))
+    sig.chart(NS, figure, key=k("roles_chart"))
     st.dataframe(result.roles, width="stretch", hide_index=True)
     st.warning("Associated conversion rates condition on the touchpoint and relative role; they are not touchpoint effects.")
 
@@ -324,7 +324,7 @@ def page_dropoff(result) -> None:
         template=sig.template(NS),
     )
     figure.update_layout(xaxis_tickformat=".0%", margin=dict(t=25))
-    st.plotly_chart(figure, width="stretch", key=k("dropoff_chart"))
+    sig.chart(NS, figure, key=k("dropoff_chart"))
     st.dataframe(result.dropoff, width="stretch", hide_index=True)
 
     st.markdown("### Observed depth survival")
@@ -338,7 +338,7 @@ def page_dropoff(result) -> None:
         template=sig.template(NS),
     )
     depth_figure.update_layout(yaxis_tickformat=".0%", margin=dict(t=25))
-    st.plotly_chart(depth_figure, width="stretch", key=k("depth_chart"))
+    sig.chart(NS, depth_figure, key=k("depth_chart"))
     st.dataframe(result.depth, width="stretch", hide_index=True)
 
 
@@ -369,7 +369,7 @@ def page_paths(result) -> None:
             template=sig.template(NS),
         )
         figure.update_layout(yaxis_tickformat=".0%", margin=dict(t=25))
-        st.plotly_chart(figure, width="stretch", key=k("paths_chart"))
+        sig.chart(NS, figure, key=k("paths_chart"))
         st.dataframe(supported, width="stretch", hide_index=True)
 
     st.markdown("### Subgroup sequence summary")
@@ -442,7 +442,7 @@ def page_markov(result) -> None:
         height=520,
         margin=dict(t=25),
     )
-    st.plotly_chart(figure, width="stretch", key=k("removal_chart"))
+    sig.chart(NS, figure, key=k("removal_chart"))
     st.dataframe(result.markov_removal, width="stretch", hide_index=True)
     st.caption("Negative sensitivity can occur after renormalization and is not evidence that a real touchpoint is harmful.")
 
