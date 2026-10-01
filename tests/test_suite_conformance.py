@@ -56,22 +56,41 @@ def test_app_uses_shared_signal_theme_instead_of_pasted_styles() -> None:
     assert "Journey" + "Signal" not in standalone + ui_source  # the retired working title must not resurface
 
 
-def test_readme_retains_full_product_contract_in_common_structure() -> None:
+def test_readme_follows_signal_template_and_keeps_product_contract() -> None:
     readme = _read("README.md")
-    headings = (
+    # Signal README template order: readers find the same section in the same place in every repo.
+    sections = [
         "## Read this first",
-        "## Supported scope",
-        "## Try it in three minutes",
-        "## Event-log contract",
-        "## Method and interpretation",
-        "## Evidence pack",
+        "## Scope",
+        "## Try the demo in three minutes",
+        "## Data contract",
+        "## Analysis contract",
+        "## Methods",
+        "## Decision statuses",
+        "## Exports",
         "## Run locally",
         "## Privacy",
-        "## Development checks",
-        "## Relationship to the Signal suite",
+        "## No install? Give this file to an AI",
+        "## Development",
+        "## Where this fits in Signal",
+        "## References",
         "## Originality and license",
-    )
-    assert all(heading in readme for heading in headings)
+    ]
+    positions = [readme.find(f"\n{heading}\n") for heading in sections]
+    assert all(position >= 0 for position in positions), dict(zip(sections, positions, strict=True))
+    assert positions == sorted(positions)
+    assert readme.startswith('<p align="center">\n  <img src="assets/tracesignal-banner.png"')
+    assert "assets/tracesignal-banner.svg" not in readme
+    assert "Signal-Customer-aa5d83" in readme  # family badge in the Customer 600 colour
+    assert "github.com/UlrikErlingsen/journey-path-analysis/actions" in readme  # tests badge
+    assert "Open event-log evidence" in readme
+    assert "**Trace Signal**" in readme
+    assert '<img src="assets/tracesignal-mark-64.png"' in readme  # suite footer
+    assert "Creator Signal" not in readme
+    assert "Journey" + "Signal" not in readme  # the retired working title must not resurface
+    for path in ("assets/tracesignal-banner.png", "assets/tracesignal-mark-64.png", "assets/tracesignal-social.png"):
+        assert (ROOT / path).exists()
+    assert not (ROOT / "assets" / "tracesignal-banner.svg").exists()
     for boundary in (
         "not a journey-diagram maker",
         "not universal funnel stages",

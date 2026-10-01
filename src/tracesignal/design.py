@@ -1,4 +1,4 @@
-"""Event-log contracts for TraceSignal."""
+"""Event-log contracts for Trace Signal."""
 
 from __future__ import annotations
 

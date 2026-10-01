@@ -1,4 +1,4 @@
-"""Deterministic, wholly fictional TraceSignal event logs."""
+"""Deterministic, wholly fictional Trace Signal event logs."""
 
 from __future__ import annotations
 

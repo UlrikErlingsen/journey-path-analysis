@@ -1,6 +1,8 @@
-# Working-name screen: TraceSignal
+# Working-name screen: Trace Signal
 
 Screen date: 17 July 2026.
+
+> **Display name since 1.1.0:** the product is written **Trace Signal** (with a space) in the Signal brand refresh; the package, file and environment-variable names stay `tracesignal` / `TRACESIGNAL_*`. The screen below was run on the exact combined string “TraceSignal” and has not been repeated for the spaced form. The refresh changes spelling only and claims no new clearance.
 
 ## Result
 
@@ -26,7 +28,7 @@ This was a practical product-name screen, not legal advice or a trademark opinio
 
 ## Recommendation
 
-Retain **TraceSignal** as the working title. Before commercial use or any release where the name carries material value, check exact and similar spellings (including the reversed-order "SignalTrace" marks) in the relevant official trademark and company registers, confirm domain and social-handle strategy, repeat GitHub/PyPI/npm/app-store searches, and obtain qualified legal advice.
+Retain **Trace Signal** (screened as “TraceSignal”) as the working title. Before commercial use or any release where the name carries material value, check exact and similar spellings (including the reversed-order "SignalTrace" marks) in the relevant official trademark and company registers, confirm domain and social-handle strategy, repeat GitHub/PyPI/npm/app-store searches, and obtain qualified legal advice.
 
 ## History
 

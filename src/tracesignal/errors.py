@@ -1,4 +1,4 @@
-"""User-facing TraceSignal errors."""
+"""User-facing Trace Signal errors."""
 
 
 class DataProblem(ValueError):
@@ -10,8 +10,8 @@ def friendly_message(exc: Exception) -> str:
     if isinstance(exc, DataProblem):
         return str(exc)
     if isinstance(exc, ValueError):
-        return f"TraceSignal could not use that setting or value: {exc}"
+        return f"Trace Signal could not use that setting or value: {exc}"
     return (
-        "TraceSignal could not complete that step. Check the event-log contract and try again. "
+        "Trace Signal could not complete that step. Check the event-log contract and try again. "
         "Set TRACESIGNAL_DEBUG=1 only in a trusted local session to inspect technical details."
     )

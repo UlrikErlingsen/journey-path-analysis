@@ -20,7 +20,8 @@ def test_product_and_package_name_are_consistent() -> None:
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert 'name = "tracesignal"' in pyproject
     assert f'version = "{__version__}"' in pyproject
-    assert "TraceSignal" in (ROOT / "README.md").read_text(encoding="utf-8")
+    # Display name has a space; technical identifiers (package, files, env vars) stay "tracesignal".
+    assert "Trace Signal" in (ROOT / "README.md").read_text(encoding="utf-8")
 
 
 def test_name_screen_is_honest_without_overclaiming() -> None:
@@ -34,7 +35,7 @@ def test_markov_removal_is_never_presented_as_causal_attribution() -> None:
     text = _product_text().lower()
     assert "not causal attribution" in text
     assert "does not estimate what would happen" in text or "not a real intervention" in text
-    assert "experimentsignal" in text
+    assert "experiment signal" in text
 
 
 def test_app_is_more_than_a_journey_diagram() -> None:

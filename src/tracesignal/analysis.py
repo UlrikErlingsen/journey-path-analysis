@@ -1,4 +1,4 @@
-"""Real event-log sequence analysis for TraceSignal."""
+"""Real event-log sequence analysis for Trace Signal."""
 
 from __future__ import annotations
 

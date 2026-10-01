@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tracesignal"
 version = "1.0.0"
-description = "TraceSignal: descriptive event-log sequence analysis for observed customer journeys"
+description = "Trace Signal: descriptive event-log sequence analysis for observed customer journeys"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "AGPL-3.0-or-later"

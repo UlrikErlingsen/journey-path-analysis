@@ -1,6 +1,6 @@
 # Decision guide
 
-Use TraceSignal to audit and describe observed sequence structure—not to award channel credit.
+Use Trace Signal to audit and describe observed sequence structure—not to award channel credit.
 
 ## Defensible questions
 
@@ -23,4 +23,4 @@ Use TraceSignal to audit and describe observed sequence structure—not to award
 - channel availability or targeting determines who can enter a path;
 - the proposed decision is to remove, fund, or claim incrementality for a touchpoint.
 
-For the last case, form a clear intervention, preregister primary metrics and guardrails, and test it in ExperimentSignal. AllocSignal may use planning assumptions, but should not treat TraceSignal removal sensitivity as causal return.
+For the last case, form a clear intervention, preregister primary metrics and guardrails, and test it in Experiment Signal. Alloc Signal may use planning assumptions, but should not treat Trace Signal removal sensitivity as causal return.

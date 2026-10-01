@@ -3,12 +3,12 @@ setlocal
 cd /d "%~dp0"
 py -3 -c "import sys; raise SystemExit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
 if errorlevel 1 (
-  echo TraceSignal needs Python 3.10 or newer.
+  echo Trace Signal needs Python 3.10 or newer.
   pause
   exit /b 1
 )
 if not exist .venv\Scripts\python.exe (
-  echo Creating TraceSignal's private Python environment...
+  echo Creating Trace Signal's private Python environment...
   py -3 -m venv .venv
 )
 call .venv\Scripts\activate.bat

@@ -1,4 +1,4 @@
-"""Regenerate TraceSignal's deterministic fictional examples."""
+"""Regenerate Trace Signal's deterministic fictional examples."""
 
 from __future__ import annotations
 

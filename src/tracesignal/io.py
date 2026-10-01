@@ -1,4 +1,4 @@
-"""Local input and evidence-pack export for TraceSignal."""
+"""Local input and evidence-pack export for Trace Signal."""
 
 from __future__ import annotations
 

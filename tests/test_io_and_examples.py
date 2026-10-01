@@ -63,7 +63,7 @@ def test_xlsx_round_trip(demo_events) -> None:
 
 def test_evidence_workbook_contains_auditable_sheets(validated, result) -> None:
     payload = build_evidence_workbook(
-        metadata={"app": "TraceSignal", "analysis_type": "descriptive"},
+        metadata={"app": "Trace Signal", "analysis_type": "descriptive"},
         audit=audit_event_log(validated),
         result=result,
     )
@@ -119,7 +119,7 @@ def test_workbook_export_neutralizes_hostile_touchpoint(demo_events, config) -> 
     validated = validate_event_log(events)
     result = analyze_journeys(validated, config)
     payload = build_evidence_workbook(
-        metadata={"app": "TraceSignal", "note": "=2+2"},
+        metadata={"app": "Trace Signal", "note": "=2+2"},
         audit=audit_event_log(validated),
         result=result,
     )

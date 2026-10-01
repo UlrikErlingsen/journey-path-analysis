@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "TraceSignal: descriptive event-log sequence evidence"
+title: "Trace Signal: descriptive event-log sequence evidence"
 type: software
 authors:
   - family-names: Erlingsen

@@ -1,4 +1,4 @@
-"""TraceSignal: descriptive event-log sequence analysis."""
+"""Trace Signal: descriptive event-log sequence analysis."""
 
 from .analysis import JourneyResult, analyze_journeys
 from .design import JourneyConfig, ValidatedJourneyData, validate_event_log

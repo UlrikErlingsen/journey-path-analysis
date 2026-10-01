@@ -1,6 +1,6 @@
-# TraceSignal AI Analyst — run this analysis with any AI, no install needed
+# Trace Signal AI Analyst — run this analysis with any AI, no install needed
 
-> Part of [TraceSignal](https://github.com/UlrikErlingsen/journey-path-analysis), a free open-source app that runs this same analysis with a point-and-click interface on your computer. This file is the no-install alternative: give it to an AI assistant and it becomes the analyst.
+> Part of [Trace Signal](https://github.com/UlrikErlingsen/journey-path-analysis), a free open-source app that runs this same analysis with a point-and-click interface on your computer. This file is the no-install alternative: give it to an AI assistant and it becomes the analyst.
 
 ## How to use this file (2 minutes)
 
@@ -75,7 +75,7 @@ Lead with the audit: journeys, events, touchpoints, conversion rate, time window
 
 ### Caveats you must always state
 
-1. Every result is descriptive, conditional on the supplied journey boundaries, identity stitching, taxonomy, and observation window. **Descriptive, not causal — test interventions in ExperimentSignal** (the experiments sibling) before any removal, funding, or incrementality claim.
+1. Every result is descriptive, conditional on the supplied journey boundaries, identity stitching, taxonomy, and observation window. **Descriptive, not causal — test interventions in Experiment Signal** (the experiments sibling) before any removal, funding, or incrementality claim.
 2. `converted = 0` is an observed-window label, not verified abandonment or dissatisfaction; late-window journeys are right-censored.
 3. Early/middle/late are relative within-journey thirds, not universal funnel stages or customer psychology.
 4. Markov removal is state deletion plus row renormalization in a fitted model — never call it attribution, contribution, or the effect of switching off a real touchpoint, and never sum sensitivities into a credit allocation.
