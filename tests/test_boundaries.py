@@ -5,14 +5,21 @@ ROOT = Path(__file__).parents[1]
 
 
 def _product_text() -> str:
-    paths = [ROOT / "app.py", ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]
+    paths = [
+        ROOT / "app.py",
+        ROOT / "src" / "tracesignal" / "ui" / "app.py",
+        ROOT / "README.md",
+        *sorted((ROOT / "docs").glob("*.md")),
+    ]
     return "\n".join(path.read_text(encoding="utf-8") for path in paths)
 
 
 def test_product_and_package_name_are_consistent() -> None:
+    from tracesignal import __version__
+
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert 'name = "tracesignal"' in pyproject
-    assert 'version = "1.0.0"' in pyproject
+    assert f'version = "{__version__}"' in pyproject
     assert "TraceSignal" in (ROOT / "README.md").read_text(encoding="utf-8")
 
 

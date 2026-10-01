@@ -32,9 +32,7 @@ dependencies = [
   "numpy>=1.24,<3",
   "openpyxl>=3.1,<4",
   "pandas>=2.0,<3",
-  "plotly>=5.18,<8",
   "scipy>=1.10,<2",
-  "streamlit>=1.38,<2",
 ]
 
 [project.urls]
@@ -43,14 +41,23 @@ Repository = "https://github.com/UlrikErlingsen/journey-path-analysis"
 Issues = "https://github.com/UlrikErlingsen/journey-path-analysis/issues"
 
 [project.optional-dependencies]
+ui = [
+  "plotly>=5.18,<8",
+  "streamlit>=1.38,<2",
+]
 test = [
   "build>=1.2,<2",
+  "plotly>=5.18,<8",
   "pytest>=8,<10",
   "ruff>=0.8,<1",
+  "streamlit>=1.38,<2",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"tracesignal.ui" = ["assets/marks/*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

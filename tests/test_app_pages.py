@@ -35,6 +35,7 @@ def test_welcome_rejects_diagram_and_causal_interpretation() -> None:
     body = "\n".join(str(markdown.value) for markdown in app.markdown)
     assert "Event logs, not workshop maps" in body
     assert "does not identify incremental channel value" in body
-    assert "ExperimentSignal" in body
-    assert "TraceSignal" in body
+    assert "Experiment Signal" in body
+    assert "Trace Signal" in body
     assert "Journey" + "Signal" not in body  # the retired working title must not resurface
+    assert "Journey" + " Signal" not in body

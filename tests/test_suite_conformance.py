@@ -1,37 +1,56 @@
 from pathlib import Path
 
+from streamlit.testing.v1 import AppTest
+
+from tracesignal import __version__
+
 
 ROOT = Path(__file__).parents[1]
+APP = str(ROOT / "app.py")
+UI = ROOT / "src" / "tracesignal" / "ui"
 
 
 def _read(relative: str) -> str:
     return (ROOT / relative).read_text(encoding="utf-8")
 
 
-def test_app_uses_signal_suite_shell_with_tracesignal_branding() -> None:
-    app = _read("app.py")
-    for token in (
-        "#173C3A",
-        "#D95B40",
-        "#83D2B4",
-        "#F2C66D",
-        "#F8F5ED",
-        "js-masthead",
-        "js-hero",
-        "js-footer",
-        "MARK_URI",
-        "Trace<span>Signal</span>",
-    ):
-        assert token in app
-    assert "Where do journeys flow, stall, and end" in app
-    assert "Event logs, not workshop maps" in app
-    assert "Journey" + "Signal" not in app  # the retired working title must not resurface
-    normalized = app.replace("'\n        \"", "").replace('"\n        "', "")
-    assert (
-        'TraceSignal v{__version__} <span>◆</span> describes logged '
-        'sequences, not incremental value <span>◆</span> Part of the Signal suite <span>◆</span> '
-        'AGPL-3.0-or-later'
-    ) in normalized
+def test_shared_signal_shell_renders() -> None:
+    app = AppTest.from_file(APP, default_timeout=120)
+    app.run()
+
+    assert not app.exception, [error.value for error in app.exception]
+    body = "\n".join(str(item.value) for item in app.markdown)
+    sidebar = "\n".join(str(item.value) for item in app.sidebar.markdown)
+    assert "ORDER → COMPARE → STRESS-TEST" in body
+    assert "OBSERVED JOURNEY SEQUENCE EVIDENCE" in body
+    assert "Where do journeys flow, stall, and end" in body
+    assert f"Trace Signal v{__version__}" in body
+    assert "describes logged sequences, not incremental value" in body
+    assert "Part of the Signal suite" in body
+    assert "AGPL-3.0-or-later" in body
+    assert "sg-mast" in body  # the shared Signal masthead
+    assert "sg-foot" in body  # the shared Signal footer
+    assert "Event-log sequence evidence—not a journey-map canvas." in sidebar
+    assert "sg-side" in sidebar  # the shared Signal sidebar lockup
+
+
+def test_app_uses_shared_signal_theme_instead_of_pasted_styles() -> None:
+    standalone = _read("app.py")
+    ui_source = (UI / "app.py").read_text(encoding="utf-8")
+    theme = (UI / "signal_theme.py").read_text(encoding="utf-8")
+    assert 'st.set_page_config(**sig.page_config("trace"))' in standalone
+    assert "sig.apply(NS)" in ui_source
+    assert "template=sig.template(NS)" in ui_source
+    assert "<style>" not in standalone + ui_source
+    for old_colour in ("#173c3a", "#d95b40", "#83d2b4", "#f2c66d", "#f8f5ed", "#17322e", "#102c2a", "#4a746d"):
+        assert old_colour not in (standalone + ui_source).lower()
+    assert (UI / "assets" / "marks" / "tracesignal-mark-64.png").exists()
+    assert ":focus-visible" in theme
+    assert "@media (max-width:760px)" in theme
+    assert "@media (prefers-reduced-motion:reduce)" in theme
+    assert "friendly_message" in ui_source
+    assert "Event logs, not workshop maps" in ui_source
+    assert "Journey" + "Signal" not in standalone + ui_source  # the retired working title must not resurface
 
 
 def test_readme_retains_full_product_contract_in_common_structure() -> None:
@@ -79,7 +98,7 @@ def test_local_runtime_is_no_telemetry_and_uses_dedicated_port() -> None:
     assert "headless = true" in config
     assert 'fileWatcherType = "none"' in config
     assert "maxUploadSize = 50" in config
-    assert 'primaryColor = "#D95B40"' in config
+    assert 'primaryColor = "#aa5d83"' in config  # Signal Customer family, 600 step
     assert "USER tracesignal" in dockerfile
     assert "chown" not in dockerfile
     assert "HEALTHCHECK" in dockerfile
