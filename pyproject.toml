@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tracesignal"
-version = "1.0.0"
+version = "1.1.0"
 description = "Trace Signal: descriptive event-log sequence analysis for observed customer journeys"
 readme = "README.md"
 requires-python = ">=3.10"
