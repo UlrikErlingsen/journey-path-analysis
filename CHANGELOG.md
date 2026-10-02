@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 — 2026-10-01
+## 1.1.0 — 2026-10-02
 
 Signal brand refresh and Signal Hub entry point. The analysis, statistics, event-log contract and exports are unchanged.
 
