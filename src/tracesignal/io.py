@@ -14,14 +14,18 @@ import pandas as pd
 
 from .analysis import JourneyResult
 from .design import JourneyAudit
-from .errors import DataProblem
+from .errors import DataProblem, out_of_memory_message
+from .limits import active, demo_limit
 
 defusedxml.defuse_stdlib()
 
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024
-MAX_EXPANDED_WORKBOOK_BYTES = 200 * 1024 * 1024
-MAX_TABLE_ROWS = 250_000
-MAX_TABLE_COLUMNS = 200
+# Size, row and column caps exist only in a public demo (SIGNAL_PUBLIC=1); see limits.py.
+CSV_CHUNK_ROWS = 500_000
+# Excel holds at most 1,048,576 rows per sheet (one is the header), and writing millions of cells into a workbook
+# takes minutes and gigabytes. A sheet above either bound carries a note instead; every table is also offered as a
+# CSV download with all rows.
+EXCEL_SHEET_ROWS = 1_048_575
+EXCEL_SHEET_CELLS = 2_000_000
 _ILLEGAL_XML = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
 
@@ -43,20 +47,39 @@ def safe_frame(frame: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def _check_shape(rows: int, columns: int) -> None:
+    limits = active()
+    if limits.table_rows is not None and rows > limits.table_rows:
+        raise DataProblem(demo_limit(f"The table exceeds the demo's {limits.table_rows:,}-row limit."))
+    if limits.table_columns is not None and columns > limits.table_columns:
+        raise DataProblem(demo_limit(f"The table exceeds the demo's {limits.table_columns}-column limit."))
+
+
 def read_table(filename: str, payload: bytes, sheet_name: str = "events") -> pd.DataFrame:
     suffix = Path(filename).suffix.lower()
+    limits = active()
     if not payload:
         raise DataProblem("This file is empty.")
-    if len(payload) > MAX_UPLOAD_BYTES:
-        raise DataProblem("Uploads are limited to 50 MB. Reduce the log to the needed columns and period.")
+    if limits.upload_bytes is not None and len(payload) > limits.upload_bytes:
+        raise DataProblem(demo_limit(f"Uploads are limited to {limits.upload_bytes // (1024 * 1024)} MB in this demo."))
     try:
         if suffix == ".csv":
-            frame = pd.read_csv(BytesIO(payload))
+            chunks: list[pd.DataFrame] = []
+            rows = 0
+            for chunk in pd.read_csv(BytesIO(payload), chunksize=CSV_CHUNK_ROWS):
+                rows += len(chunk)
+                _check_shape(rows, len(chunk.columns))
+                chunks.append(chunk)
+            frame = chunks[0] if len(chunks) == 1 else pd.concat(chunks, ignore_index=True)
+            del chunks
         elif suffix in {".xlsx", ".xlsm"}:
-            with zipfile.ZipFile(BytesIO(payload)) as workbook_zip:
-                expanded = sum(member.file_size for member in workbook_zip.infolist())
-            if expanded > MAX_EXPANDED_WORKBOOK_BYTES:
-                raise DataProblem("This workbook expands beyond 200 MB. Remove unrelated sheets before upload.")
+            if limits.expanded_workbook_bytes is not None:
+                with zipfile.ZipFile(BytesIO(payload)) as workbook_zip:
+                    expanded = sum(member.file_size for member in workbook_zip.infolist())
+                if expanded > limits.expanded_workbook_bytes:
+                    raise DataProblem(
+                        demo_limit(f"Workbooks may expand to at most {limits.expanded_workbook_bytes // (1024 * 1024)} MB.")
+                    )
             workbook = pd.ExcelFile(BytesIO(payload))
             selected = sheet_name if sheet_name in workbook.sheet_names else workbook.sheet_names[0]
             frame = pd.read_excel(workbook, sheet_name=selected)
@@ -64,12 +87,11 @@ def read_table(filename: str, payload: bytes, sheet_name: str = "events") -> pd.
             raise DataProblem("Upload a CSV or XLSX file.")
     except DataProblem:
         raise
+    except MemoryError as exc:
+        raise DataProblem(out_of_memory_message("this file")) from exc
     except Exception as exc:  # pragma: no cover - parser messages vary by dependency
         raise DataProblem(f"Could not read {filename}: {exc}") from exc
-    if len(frame) > MAX_TABLE_ROWS:
-        raise DataProblem(f"The table exceeds the {MAX_TABLE_ROWS:,}-row safety limit; sample or shorten the log.")
-    if len(frame.columns) > MAX_TABLE_COLUMNS:
-        raise DataProblem(f"The table exceeds the {MAX_TABLE_COLUMNS}-column safety limit; keep the needed columns.")
+    _check_shape(len(frame), len(frame.columns))
     return frame
 
 
@@ -126,5 +148,14 @@ def build_evidence_workbook(
             "limitations": pd.DataFrame({"warning": result.warnings}),
         }
         for sheet_name, frame in sheets.items():
+            if len(frame) > EXCEL_SHEET_ROWS or frame.size > EXCEL_SHEET_CELLS:
+                frame = pd.DataFrame(
+                    {
+                        "note": [
+                            f"This table has {len(frame):,} rows × {len(frame.columns)} columns, too large for a "
+                            "workbook sheet. Download its CSV from the Evidence pack page: it contains every row."
+                        ]
+                    }
+                )
             safe_frame(frame).to_excel(writer, sheet_name=sheet_name, index=False)
     return output.getvalue()

@@ -13,4 +13,4 @@ __all__ = [
     "validate_event_log",
 ]
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"

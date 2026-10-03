@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .errors import DataProblem
+from .limits import active, demo_limit
 
 
 REQUIRED_COLUMNS = ("journey_id", "timestamp", "touchpoint", "converted")
@@ -51,35 +52,58 @@ class JourneyAudit:
     warnings: list[str]
 
 
-def _stable_within_journey(events: pd.DataFrame, column: str) -> None:
-    unstable = events.groupby("journey_id", observed=True)[column].nunique(dropna=False)
-    if (unstable > 1).any():
-        journey = unstable[unstable > 1].index[0]
+def _strip_text(series: pd.Series) -> pd.Series:
+    """``series.astype(str).str.strip()``, stripping each distinct value once (event logs repeat values a lot)."""
+    codes, uniques = pd.factorize(series.astype(str), sort=False)
+    stripped = np.asarray(pd.Index(uniques).str.strip(), dtype=object)
+    return pd.Series(stripped[codes], index=series.index)
+
+
+def _stable_within_journey(
+    events: pd.DataFrame, column: str, journey_codes: np.ndarray, journey_labels: np.ndarray
+) -> None:
+    """Every journey has one value of ``column`` (missing counts as a value); name the first journey that does not.
+
+    ``journey_codes`` number the journeys in sorted order, so the first offender matches a sorted groupby.
+    """
+    values, _ = pd.factorize(events[column], use_na_sentinel=False)
+    width = int(values.max()) + 1 if len(values) else 1
+    pairs = np.unique(journey_codes.astype(np.int64) * width + values)
+    values_per_journey = np.bincount(pairs // width, minlength=len(journey_labels))
+    unstable = np.flatnonzero(values_per_journey > 1)
+    if unstable.size:
+        journey = journey_labels[unstable[0]]
         raise DataProblem(f"{column} must be stable within each journey; {journey} has several values.")
 
 
 def validate_event_log(events: pd.DataFrame) -> ValidatedJourneyData:
     """Validate and standardize a case-based, timestamped touchpoint event log."""
 
-    events = events.copy()
     missing = [column for column in REQUIRED_COLUMNS if column not in events]
     if missing:
         raise DataProblem(f"Event log is missing: {', '.join(missing)}.")
     if events.empty:
         raise DataProblem("The event log contains no rows.")
-    if len(events) > 250_000:
-        raise DataProblem("This local workbench supports at most 250,000 events per run.")
+    limits = active()
+    if limits.table_rows is not None and len(events) > limits.table_rows:
+        raise DataProblem(demo_limit(f"The demo analyzes at most {limits.table_rows:,} events per run."))
+    events = events.copy()
 
     for column in ("journey_id", "touchpoint"):
         if events[column].isna().any():
             raise DataProblem(f"{column} cannot contain missing values.")
-        events[column] = events[column].astype(str).str.strip()
+        events[column] = _strip_text(events[column])
         if events[column].eq("").any():
             raise DataProblem(f"{column} cannot contain blank values.")
-    reserved = events["touchpoint"].str.upper().isin(RESERVED_STATES)
-    if reserved.any():
+    touchpoint_codes, touchpoint_labels = pd.factorize(events["touchpoint"], sort=True)
+    reserved_labels = pd.Index(touchpoint_labels).str.upper().isin(RESERVED_STATES)
+    if reserved_labels.any():
+        reserved = reserved_labels[touchpoint_codes]
         value = events.loc[reserved, "touchpoint"].iloc[0]
         raise DataProblem(f"Touchpoint name {value} is reserved for the sequence model.")
+    # Journeys numbered in sorted order: used for the stability checks and the final sort.
+    journey_codes, journey_labels = pd.factorize(events["journey_id"], sort=True)
+    journey_labels = np.asarray(journey_labels, dtype=object)
 
     try:
         events["timestamp"] = pd.to_datetime(events["timestamp"], utc=True, errors="raise")
@@ -106,14 +130,14 @@ def validate_event_log(events: pd.DataFrame) -> ValidatedJourneyData:
     if converted.isna().any() or not set(converted.unique()).issubset({0, 1}):
         raise DataProblem("converted must contain only 0 and 1.")
     events["converted"] = converted.astype(int)
-    _stable_within_journey(events, "converted")
+    _stable_within_journey(events, "converted", journey_codes, journey_labels)
 
     warnings: list[str] = []
     if "subgroup" not in events:
         events["subgroup"] = "All journeys"
         warnings.append("No subgroup was supplied; path comparison uses one all-journey group.")
-    events["subgroup"] = events["subgroup"].fillna("Unspecified").astype(str).str.strip().replace("", "Unspecified")
-    _stable_within_journey(events, "subgroup")
+    events["subgroup"] = _strip_text(events["subgroup"].fillna("Unspecified")).replace("", "Unspecified")
+    _stable_within_journey(events, "subgroup", journey_codes, journey_labels)
 
     if "journey_value" not in events:
         events["journey_value"] = 0.0
@@ -122,13 +146,13 @@ def validate_event_log(events: pd.DataFrame) -> ValidatedJourneyData:
         raise DataProblem("journey_value must contain finite numeric values.")
     if (events["journey_value"] < 0).any():
         raise DataProblem("journey_value cannot be negative.")
-    _stable_within_journey(events, "journey_value")
+    _stable_within_journey(events, "journey_value", journey_codes, journey_labels)
     if ((events["converted"] == 0) & (events["journey_value"] > 0)).any():
         warnings.append("Some non-converted journeys have positive value; value is retained but not interpreted as conversion value.")
 
     if "customer_id" in events:
         events["customer_id"] = events["customer_id"].fillna("Unspecified").astype(str)
-        _stable_within_journey(events, "customer_id")
+        _stable_within_journey(events, "customer_id", journey_codes, journey_labels)
     else:
         events["customer_id"] = events["journey_id"]
         warnings.append(
@@ -141,14 +165,22 @@ def validate_event_log(events: pd.DataFrame) -> ValidatedJourneyData:
         raise DataProblem("At least 20 journeys are required for sequence analysis.")
     if touchpoints < 3:
         raise DataProblem("At least three distinct touchpoints are required.")
-    if touchpoints > 60:
-        raise DataProblem("At most 60 distinct touchpoints are supported in the local Markov workbench.")
+    if limits.touchpoints is not None and touchpoints > limits.touchpoints:
+        raise DataProblem(demo_limit(f"The demo supports at most {limits.touchpoints} distinct touchpoints."))
     if events["converted"].nunique() < 2:
         raise DataProblem("Both converted and non-converted journeys are required for drop-off and removal analysis.")
 
-    events = events.sort_values(
-        ["journey_id", "timestamp", "event_order", "touchpoint"], kind="mergesort"
-    ).reset_index(drop=True)
+    # Same order as a stable sort on journey_id, timestamp, event_order and touchpoint, but on integer codes
+    # (sorted factorizations) rather than millions of strings.
+    order = np.lexsort(
+        (
+            touchpoint_codes,
+            events["event_order"].to_numpy(dtype=float),
+            events["timestamp"].astype("int64").to_numpy(),
+            journey_codes,
+        )
+    )
+    events = events.take(order).reset_index(drop=True)
     warnings.extend(
         [
             "The event log contains observed and successfully stitched touchpoints only; missing exposures remain invisible.",

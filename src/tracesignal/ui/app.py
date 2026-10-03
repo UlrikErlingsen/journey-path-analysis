@@ -20,6 +20,7 @@ from tracesignal.design import audit_event_log
 from tracesignal.errors import friendly_message
 from tracesignal.examples import make_demo_events, make_starter_template
 from tracesignal.io import build_evidence_workbook, dataframe_csv_bytes, read_table
+from tracesignal.limits import DEMO_NOTE, active
 from tracesignal.ui import signal_theme as sig
 
 
@@ -50,6 +51,13 @@ STATE_COLORS = {
     "DROP_OFF": sig.FAMILIES["brand"]["600"],
 }
 ROLE_COLORS = dict(zip(["Early", "Middle", "Late"], sig.colorway(NS), strict=False))
+# On-screen tables show at most this many rows; every calculation and export uses all rows.
+SCREEN_TABLE_ROWS = 1_000
+# Above this many events the evidence files are built only when their download button is clicked.
+LAZY_EXPORT_EVENTS = 250_000
+# Above this many touchpoints the Markov bootstrap can take a while; the app says so instead of refusing.
+MARKOV_ADVICE_TOUCHPOINTS = 60
+
 # Removal sensitivity: the two signs sit on opposite arms of the shared diverging palette.
 POSITIVE_SENSITIVITY = sig.DIVERGING[1]
 NEGATIVE_SENSITIVITY = sig.DIVERGING[5]
@@ -68,38 +76,96 @@ def _demo() -> pd.DataFrame:
     return make_demo_events()
 
 
-@st.cache_data(show_spinner="Analyzing observed journey sequences…")
+def _session_memo(name: str, key: object, compute):
+    """Keep one result per name in this session while ``key`` is unchanged.
+
+    Results stay in the session rather than ``st.cache_data``: hashing and copying an event log with millions of
+    rows on every rerun would cost more than the analysis it protects.
+    """
+    cached = st.session_state.get(k(name))
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    value = compute()
+    st.session_state[k(name)] = (key, value)
+    return value
+
+
+def _validated(events: pd.DataFrame):
+    token = st.session_state.get(k("events_token"))
+
+    def compute():
+        data = validate_event_log(events)
+        return data, audit_event_log(data)
+
+    if st.session_state.get(k("validation"), (None,))[0] == token:
+        return _session_memo("validation", token, compute)
+    with st.spinner(f"Checking {len(events):,} events against the sequence contract…"):
+        return _session_memo("validation", token, compute)
+
+
 def _analyze(events: pd.DataFrame, config: JourneyConfig):
-    data = validate_event_log(events)
-    return data, audit_event_log(data), analyze_journeys(data, config)
+    token = st.session_state.get(k("events_token"))
+    data, audit = _validated(events)
+    if st.session_state.get(k("analysis"), (None,))[0] == (token, config):
+        return data, audit, _session_memo("analysis", (token, config), lambda: None)
+    with st.spinner("Analyzing observed journey sequences…"):
+        result = _session_memo("analysis", (token, config), lambda: analyze_journeys(data, config))
+    return data, audit, result
 
 
 def _ensure_state() -> None:
     """Seed the active event log with the fictional demonstration on the first run of a session."""
     if k("events") not in st.session_state:
-        st.session_state[k("events")] = _demo()
-        st.session_state[k("source_label")] = DEMO_LABEL
+        _store_events(_demo, DEMO_LABEL, "demo")
 
 
-def _store_events(frame: pd.DataFrame, label: str) -> None:
-    st.session_state[k("events")] = frame
+def _store_events(load, label: str, token: object) -> None:
+    """Make an event log active. ``load`` runs only when ``token`` names a different log than the active one."""
+    if st.session_state.get(k("events_token")) != token:
+        st.session_state[k("events")] = load()
+        st.session_state[k("events_token")] = token
+        for name in ("validation", "analysis", "evidence"):
+            st.session_state.pop(k(name), None)
     st.session_state[k("source_label")] = label
+
+
+def _show_table(frame: pd.DataFrame) -> None:
+    """Show a table on screen, truncated to SCREEN_TABLE_ROWS rows with a note; exports keep every row."""
+    if len(frame) > SCREEN_TABLE_ROWS:
+        st.dataframe(frame.head(SCREEN_TABLE_ROWS), width="stretch", hide_index=True)
+        st.caption(
+            f"Showing the first {SCREEN_TABLE_ROWS:,} of {len(frame):,} rows. The evidence pack and CSV downloads "
+            "contain every row."
+        )
+    else:
+        st.dataframe(frame, width="stretch", hide_index=True)
 
 
 def _load_data() -> None:
     """Read the selected data source into session state. A failed upload stops the run instead of using the demo."""
     source = st.sidebar.radio("Data source", ["Fictional demonstration", "Upload my event log"], key=k("data_source"))
     if source == "Fictional demonstration":
-        _store_events(_demo(), DEMO_LABEL)
+        _store_events(_demo, DEMO_LABEL, "demo")
         return
     upload = st.sidebar.file_uploader("Journey events · CSV or XLSX", type=["csv", "xlsx", "xlsm"], key=k("upload"))
     if upload is None:
         st.sidebar.info("Upload an event log. Until then, the fictional demonstration remains active.")
-        _store_events(_demo(), "Fictional demonstration while upload is incomplete")
+        _store_events(_demo, "Fictional demonstration while upload is incomplete", "demo")
         return
+    # Read each uploaded file once: rereading a large log on every rerun would make every click slow.
+    token = ("upload", str(getattr(upload, "file_id", "") or upload.name), upload.name, int(getattr(upload, "size", 0)))
     try:
-        frame = read_table(upload.name, upload.getvalue(), sheet_name="events")
+        failed = st.session_state.get(k("upload_failure"))
+        if failed is not None and failed[0] == token:
+            raise failed[1]
+
+        def load() -> pd.DataFrame:
+            with st.spinner(f"Reading {upload.name}…"):
+                return read_table(upload.name, upload.getvalue(), sheet_name="events")
+
+        _store_events(load, "User-supplied local event log", token)
     except Exception as exc:
+        st.session_state[k("upload_failure")] = (token, exc)
         # A failed upload must never silently fall back to demo data: stop the
         # run loudly so demo results cannot be mistaken for the user's data.
         st.sidebar.error(friendly_message(exc))
@@ -109,7 +175,6 @@ def _load_data() -> None:
         )
         st.stop()
         raise  # unreachable; keeps the control flow explicit for type checkers
-    _store_events(frame, "User-supplied local event log")
 
 
 def _config() -> JourneyConfig:
@@ -119,9 +184,13 @@ def _config() -> JourneyConfig:
     outcome_support = st.sidebar.slider(
         "Minimum transitions per outcome cell", 2, 50, 10, key=k("min_outcome_support")
     )
+    bootstrap_cap = active().bootstrap_repetitions
+    bootstrap_options = [option for option in (100, 200, 300, 500) if bootstrap_cap is None or option <= bootstrap_cap]
     bootstrap = st.sidebar.select_slider(
-        "Removal bootstrap repetitions", options=[100, 200, 300, 500], value=200, key=k("bootstrap_repetitions")
+        "Removal bootstrap repetitions", options=bootstrap_options, value=200, key=k("bootstrap_repetitions")
     )
+    if bootstrap_cap is not None:
+        st.sidebar.caption(f"At most {bootstrap_cap} repetitions. {DEMO_NOTE}")
     confidence = st.sidebar.select_slider(
         "Interval level", options=[0.90, 0.95, 0.99], value=0.95, key=k("confidence_level")
     )
@@ -204,8 +273,7 @@ def page_welcome() -> None:
 def page_data(events: pd.DataFrame, source_label: str, config: JourneyConfig) -> None:
     sig.header("Step 1", "Data & sequence contract")
     st.caption(source_label)
-    data = validate_event_log(events)
-    audit = audit_event_log(data)
+    data, audit = _validated(events)
     values = dict(zip(audit.overview["measure"], audit.overview["value"], strict=True))
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Journeys", f"{int(values['Journeys']):,}")
@@ -222,6 +290,12 @@ def page_data(events: pd.DataFrame, source_label: str, config: JourneyConfig) ->
     with right:
         st.markdown("### Touchpoint coverage")
         st.dataframe(audit.touchpoint_counts, width="stretch", hide_index=True)
+    if int(values["Touchpoints"]) > MARKOV_ADVICE_TOUCHPOINTS:
+        st.info(
+            f"This log has {int(values['Touchpoints']):,} distinct touchpoints. Every analysis runs, but the Markov "
+            "removal bootstrap solves one system per touchpoint and repetition, so it can take a while; fewer "
+            "bootstrap repetitions in the sidebar make it faster."
+        )
 
     st.markdown("### Event-log preview")
     st.dataframe(data.events.head(100), width="stretch", hide_index=True)
@@ -339,7 +413,7 @@ def page_dropoff(result) -> None:
     )
     depth_figure.update_layout(yaxis_tickformat=".0%", margin=dict(t=25))
     sig.chart(NS, depth_figure, key=k("depth_chart"))
-    st.dataframe(result.depth, width="stretch", hide_index=True)
+    _show_table(result.depth)
 
 
 def page_paths(result) -> None:
@@ -370,7 +444,7 @@ def page_paths(result) -> None:
         )
         figure.update_layout(yaxis_tickformat=".0%", margin=dict(t=25))
         sig.chart(NS, figure, key=k("paths_chart"))
-        st.dataframe(supported, width="stretch", hide_index=True)
+        _show_table(supported)
 
     st.markdown("### Subgroup sequence summary")
     st.dataframe(result.subgroup_summary, width="stretch", hide_index=True)
@@ -380,7 +454,7 @@ def page_paths(result) -> None:
     group_paths = result.subgroup_paths.loc[
         (result.subgroup_paths["subgroup"] == selected_group) & result.subgroup_paths["meets_minimum_support"]
     ]
-    st.dataframe(group_paths, width="stretch", hide_index=True)
+    _show_table(group_paths)
 
     st.markdown("### Transitions in converted versus drop-off journeys")
     st.write(
@@ -392,7 +466,7 @@ def page_paths(result) -> None:
     if supported_outcome.empty:
         st.info("No transition reaches the selected per-outcome support threshold.")
     else:
-        st.dataframe(supported_outcome, width="stretch", hide_index=True)
+        _show_table(supported_outcome)
     st.caption(
         f"Only transitions with at least {result.config.min_outcome_transition_support} observations in both the "
         "converted and drop-off groups are shown, so sparse cells cannot top the ranking. The differences carry no "
@@ -465,7 +539,24 @@ def page_evidence(audit, result, source_label: str) -> None:
         "role_boundary": "Early/middle/late are relative observed positions",
         "intervention_handoff": "Experiment Signal",
     }
-    workbook = build_evidence_workbook(metadata=metadata, audit=audit, result=result)
+    def build_workbook() -> bytes:
+        return build_evidence_workbook(metadata=metadata, audit=audit, result=result)
+
+    large = len(result.event_positions) > LAZY_EXPORT_EVENTS
+    if large:
+        # Large logs: Streamlit builds each file only when its button is clicked, so reruns stay fast.
+        st.caption(
+            "This is a large log, so each file below is prepared when you click it; the evidence pack can take a "
+            "minute or more. Tables longer than one Excel sheet are in their CSV downloads."
+        )
+        workbook = build_workbook
+    else:
+        token = (st.session_state.get(k("events_token")), result.config, source_label)
+        workbook = _session_memo("evidence", token, build_workbook)
+
+    def csv_download(frame: pd.DataFrame):
+        return (lambda: dataframe_csv_bytes(frame)) if large else dataframe_csv_bytes(frame)
+
     st.download_button(
         "Download Trace Signal evidence pack",
         workbook,
@@ -477,24 +568,46 @@ def page_evidence(audit, result, source_label: str) -> None:
     c1, c2, c3 = st.columns(3)
     c1.download_button(
         "Transitions CSV",
-        dataframe_csv_bytes(result.transitions),
+        csv_download(result.transitions),
         "tracesignal-transitions.csv",
         "text/csv",
         key=k("download_transitions"),
     )
     c2.download_button(
         "Paths CSV",
-        dataframe_csv_bytes(result.paths),
+        csv_download(result.paths),
         "tracesignal-paths.csv",
         "text/csv",
         key=k("download_paths"),
     )
     c3.download_button(
         "Removal sensitivity CSV",
-        dataframe_csv_bytes(result.markov_removal),
+        csv_download(result.markov_removal),
         "tracesignal-removal-sensitivity.csv",
         "text/csv",
         key=k("download_removal_sensitivity"),
+    )
+    c4, c5, c6 = st.columns(3)
+    c4.download_button(
+        "Journeys CSV",
+        csv_download(_session_memo("journeys_export", id(result), lambda: result.journeys.drop(columns="sequence"))),
+        "tracesignal-journeys.csv",
+        "text/csv",
+        key=k("download_journeys"),
+    )
+    c5.download_button(
+        "Event positions CSV",
+        csv_download(result.event_positions),
+        "tracesignal-event-positions.csv",
+        "text/csv",
+        key=k("download_event_positions"),
+    )
+    c6.download_button(
+        "Subgroup paths CSV",
+        csv_download(result.subgroup_paths),
+        "tracesignal-subgroup-paths.csv",
+        "text/csv",
+        key=k("download_subgroup_paths"),
     )
     st.json(metadata)
     st.info("The export contains observed sequence evidence and model diagnostics, not a journey diagram or causal channel-credit allocation.")
@@ -552,7 +665,11 @@ def _sidebar() -> tuple[str, JourneyConfig]:
     _load_data()
     config = _config()
     events = st.session_state[k("events")]
-    journey_count = f"{events['journey_id'].nunique():,}" if "journey_id" in events else "unvalidated"
+    journey_count = (
+        f"{_session_memo('journey_count', st.session_state.get(k('events_token')), lambda: events['journey_id'].nunique()):,}"
+        if "journey_id" in events
+        else "unvalidated"
+    )
     st.sidebar.caption(f"Active data · {journey_count} journeys × {len(events):,} events")
     st.sidebar.divider()
     st.sidebar.caption("Local mode · no telemetry · no external AI calls · uploads stay in this Python process")

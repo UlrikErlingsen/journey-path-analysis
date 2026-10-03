@@ -39,7 +39,7 @@ Optional columns:
 - `subgroup` — stable within journey; enables within-subgroup path comparison.
 - `journey_value` — finite, non-negative, stable within journey.
 
-Refuse fewer than 20 journeys, fewer than 3 distinct touchpoints, more than 60 distinct touchpoints, or a log with only one outcome class. Duplicate (journey_id, timestamp, event_order) keys are invalid.
+Refuse fewer than 20 journeys, fewer than 3 distinct touchpoints, or a log with only one outcome class (there is no upper limit on touchpoints; the public demo caps them at 60). Duplicate (journey_id, timestamp, event_order) keys are invalid.
 
 ### Ordering and collapse rules
 

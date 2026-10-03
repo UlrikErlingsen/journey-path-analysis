@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.0 — 2026-10-03
+
+### Larger datasets
+
+- Larger datasets: run locally (standalone, a local Signal Hub or an internal deployment), Trace Signal no longer sets any limit on file size, rows, columns, events or touchpoints; memory is the limit. The former 50 MB upload, 200 MB expanded-workbook, 250,000-row, 200-column and 60-touchpoint limits, plus a 300-repetition bootstrap cap, now apply only in the public demo (`SIGNAL_PUBLIC=1`), where messages say they are demo limits. All caps live in the new `tracesignal.limits` module.
+- Streamlit's upload cap is 10,000 MB: `.streamlit/config.toml`, `TRACESIGNAL_MAX_UPLOAD_MB` (default 10000, was 50) in both launchers, and `STREAMLIT_SERVER_MAX_UPLOAD_SIZE=10000` in the Docker image.
+- Running out of memory while loading or analyzing is reported as a plain "not enough memory on this computer" message.
+- The analysis is computed column-wise instead of journey by journey: sequence preparation, transitions, drop-off, depth, paths, the memory diagnostic and the clustered Markov bootstrap (cluster transition counts weighted by how often each cluster is drawn). Results are identical to 1.1.0 on the same data and seed; the fictional demo analyzes about ten times faster. Validation strips and sorts on integer codes.
+- The app reads an upload once and keeps validation and analysis in the session instead of re-reading, re-hashing and copying the log on every rerun.
+- Long on-screen tables show their first 1,000 rows with a note. Every table remains complete in the downloads: new Journeys, Event positions and Subgroup paths CSVs, and a workbook sheet too large for Excel points to its CSV. Large evidence files are built when their button is clicked.
+- Measured on a 24-thread desktop: a 5-million-event log (1 million journeys, 334 MB) loads in about 5 seconds, validates in about 17 seconds and is fully analyzed with 200 bootstrap repetitions in about 32 seconds, with a peak of about 3.2 GB.
+
+### Suite
+
+- Suite: Rival, Reach, Learn and Blueprint Signal added to the suite table.
+
 ## 1.1.0 — 2026-10-02
 
 Signal brand refresh and Signal Hub entry point. The analysis, statistics, event-log contract and exports are unchanged.

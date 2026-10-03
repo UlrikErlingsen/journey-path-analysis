@@ -67,7 +67,15 @@ Required columns:
 - `touchpoint`: the observed state label;
 - `converted`: a stable binary journey outcome.
 
-Optional columns are numeric `event_order` for timestamp ties, stable `customer_id` for clustered uncertainty, stable `subgroup`, and non-negative stable `journey_value`. The app requires at least 20 journeys, three touchpoints, and both outcomes. Tied timestamps require explicit order; reserved terminal-state labels and duplicate event keys are refused. Uploads are capped at 50 MB, 250,000 rows, and 200 columns as a local safety limit. The fictional event log and a starter template are in [`examples/`](examples/). See the [data guide](docs/data-guide.md).
+Optional columns are numeric `event_order` for timestamp ties, stable `customer_id` for clustered uncertainty, stable `subgroup`, and non-negative stable `journey_value`. The app requires at least 20 journeys, three touchpoints, and both outcomes. Tied timestamps require explicit order; reserved terminal-state labels and duplicate event keys are refused. The fictional event log and a starter template are in [`examples/`](examples/). See the [data guide](docs/data-guide.md).
+
+### Data limits
+
+**Run locally there is no built-in limit** on file size, rows, columns, events, journeys or touchpoints: your computer's memory is the limit. Streamlit's upload cap defaults to 10,000 MB (`TRACESIGNAL_MAX_UPLOAD_MB` in the launchers, `STREAMLIT_SERVER_MAX_UPLOAD_SIZE` in Docker). If a file or step needs more memory than the computer has, the app says so plainly instead of crashing. Every calculation uses every event; preparation, transitions, paths and the clustered Markov bootstrap are computed column-wise, so they scale with the log. On screen, long tables show their first 1,000 rows with a note; the CSV downloads contain every row, and a workbook sheet too large for Excel points to its CSV. Large evidence files are built when their button is clicked.
+
+On a 24-thread desktop with 32 GB of memory, a 5-million-event log (1 million journeys, 334 MB CSV) loaded in about 5 seconds, passed the sequence contract in about 17 seconds and was fully analyzed (200 bootstrap repetitions) in about 32 seconds, with a peak of about 3.2 GB of memory.
+
+**The public online demo** (`SIGNAL_PUBLIC=1`) keeps hard caps to protect a shared server: 50 MB per upload, 200 MB of expanded Excel content, 250,000 rows, 200 columns, 60 distinct touchpoints and 300 bootstrap repetitions. Its messages say they are demo limits; the downloaded app has none. All caps live in `src/tracesignal/limits.py`.
 
 ## Analysis contract
 
@@ -129,7 +137,7 @@ python -m pip install -r requirements.txt
 python -m streamlit run app.py --server.port=8585
 ```
 
-Trace Signal prefers local port `8585` and falls back to another free port on macOS. The launcher accepts `TRACESIGNAL_PORT`, `TRACESIGNAL_MAX_UPLOAD_MB`, `TRACESIGNAL_NO_BROWSER`, and `TRACESIGNAL_DEBUG` environment variables.
+Trace Signal prefers local port `8585` and falls back to another free port on macOS. The launcher accepts `TRACESIGNAL_PORT`, `TRACESIGNAL_MAX_UPLOAD_MB` (Streamlit's upload cap in MB, default 10000), `TRACESIGNAL_NO_BROWSER`, and `TRACESIGNAL_DEBUG` environment variables.
 
 ### Docker
 
@@ -138,7 +146,7 @@ docker build -t tracesignal .
 docker run --rm -p 8585:8585 tracesignal
 ```
 
-Then open `http://127.0.0.1:8585`. The health-checked container runs as a non-root user with root-owned application code.
+Then open `http://127.0.0.1:8585`. The health-checked container runs as a non-root user with root-owned application code. The image sets `STREAMLIT_SERVER_MAX_UPLOAD_SIZE=10000` (MB); pass `-e STREAMLIT_SERVER_MAX_UPLOAD_SIZE=<MB>` for another cap and `-e SIGNAL_PUBLIC=1` for the public-demo caps.
 
 ## Privacy
 

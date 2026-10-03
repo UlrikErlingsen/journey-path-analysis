@@ -119,7 +119,7 @@ def test_local_runtime_is_no_telemetry_and_uses_dedicated_port() -> None:
     assert 'base = "light"' in config
     assert "headless = true" in config
     assert 'fileWatcherType = "none"' in config
-    assert "maxUploadSize = 50" in config
+    assert "maxUploadSize = 10000" in config
     assert 'primaryColor = "#aa5d83"' in config  # Signal Customer family, 600 step
     assert "USER tracesignal" in dockerfile
     assert "chown" not in dockerfile
@@ -128,7 +128,8 @@ def test_local_runtime_is_no_telemetry_and_uses_dedicated_port() -> None:
     assert "[8585, *range(8501, 8600)]" in launcher
     assert "--browser.gatherUsageStats=false" in launcher
     assert "TRACESIGNAL_MAX_UPLOAD_MB" in launcher
-    assert 'TRACESIGNAL_MAX_UPLOAD_MB:-50' in launcher
+    assert 'TRACESIGNAL_MAX_UPLOAD_MB:-10000' in launcher
+    assert "STREAMLIT_SERVER_MAX_UPLOAD_SIZE=10000" in dockerfile
 
 
 def test_ci_runs_tests_lint_and_build_without_a_publish_job() -> None:

@@ -21,5 +21,5 @@ if not exist .venv\.tracesignal-requirements-%REQ_HASH% (
   type nul > .venv\.tracesignal-requirements-%REQ_HASH%
 )
 if not defined TRACESIGNAL_PORT set TRACESIGNAL_PORT=8585
-if not defined TRACESIGNAL_MAX_UPLOAD_MB set TRACESIGNAL_MAX_UPLOAD_MB=50
+if not defined TRACESIGNAL_MAX_UPLOAD_MB set TRACESIGNAL_MAX_UPLOAD_MB=10000
 python -m streamlit run app.py --server.headless=false --server.address=127.0.0.1 --server.port=%TRACESIGNAL_PORT% --server.maxUploadSize=%TRACESIGNAL_MAX_UPLOAD_MB% --server.fileWatcherType=none --browser.gatherUsageStats=false

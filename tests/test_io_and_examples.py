@@ -10,9 +10,8 @@ import pytest
 from tracesignal.design import audit_event_log
 from tracesignal.errors import DataProblem
 from tracesignal.examples import make_demo_events, make_starter_template
+from tracesignal.limits import PUBLIC_DEMO
 from tracesignal.io import (
-    MAX_TABLE_COLUMNS,
-    MAX_UPLOAD_BYTES,
     build_evidence_workbook,
     dataframe_csv_bytes,
     read_table,
@@ -138,9 +137,10 @@ def test_workbook_export_neutralizes_hostile_touchpoint(demo_events, config) -> 
     assert neutralized_cells > 0
 
 
-def test_oversized_upload_is_refused() -> None:
-    with pytest.raises(DataProblem, match="50 MB"):
-        read_table("big.csv", b"0" * (MAX_UPLOAD_BYTES + 1))
+def test_oversized_upload_is_refused_in_the_public_demo(monkeypatch) -> None:
+    monkeypatch.setenv("SIGNAL_PUBLIC", "1")
+    with pytest.raises(DataProblem, match="50 MB in this demo"):
+        read_table("big.csv", b"0" * (PUBLIC_DEMO.upload_bytes + 1))
 
 
 def test_empty_upload_is_refused() -> None:
@@ -148,10 +148,13 @@ def test_empty_upload_is_refused() -> None:
         read_table("empty.csv", b"")
 
 
-def test_too_many_columns_are_refused() -> None:
-    header = ",".join(f"c{i}" for i in range(MAX_TABLE_COLUMNS + 1))
-    payload = (header + "\n" + ",".join("1" for _ in range(MAX_TABLE_COLUMNS + 1))).encode("utf-8")
-    with pytest.raises(DataProblem, match="column safety limit"):
+def test_too_many_columns_are_refused_in_the_public_demo(monkeypatch) -> None:
+    columns = PUBLIC_DEMO.table_columns + 1
+    header = ",".join(f"c{i}" for i in range(columns))
+    payload = (header + "\n" + ",".join("1" for _ in range(columns))).encode("utf-8")
+    assert read_table("wide.csv", payload).shape == (1, columns)  # local mode: no column limit
+    monkeypatch.setenv("SIGNAL_PUBLIC", "1")
+    with pytest.raises(DataProblem, match="200-column limit"):
         read_table("wide.csv", payload)
 
 
